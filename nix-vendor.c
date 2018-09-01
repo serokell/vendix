@@ -16,13 +16,13 @@
 #define NIX_HOME "/nix"
 
 // TODO: Call getenv("DYLD_ROOT_PATH") only once
-static char *expand_store(const char *path) {
-  char *store_path = NULL;
+static char *expand_store(const char *source) {
+  char *target = NULL;
 
-  if (strncmp(NIX_HOME, path, strlen(NIX_HOME)) == 0)
-    asprintf(&store_path, "%s%s", getenv("DYLD_ROOT_PATH"), path);
+  if (strncmp(NIX_HOME, source, strlen(NIX_HOME)) == 0)
+    asprintf(&target, "%s%s", getenv("DYLD_ROOT_PATH"), source);
 
-  return store_path;
+  return target;
 }
 
 static void freep(void *p) { free(*(void **)p); }
@@ -33,12 +33,12 @@ static void freep(void *p) { free(*(void **)p); }
 
 #define OR(x, y) x ? x : y
 
-#define EXPAND_STORE_TO(path, target)                                          \
-  raii char *target = expand_store(path);                                      \
-  path = OR(target, path)
+#define EXPAND_STORE_TO(source, target)                                        \
+  raii char *target = expand_store(source);                                    \
+  source = OR(target, source)
 
-#define EXPAND_STORE(path)                                                     \
-  EXPAND_STORE_TO(path, CONCAT(store_path, __COUNTER__))
+#define EXPAND_STORE(source)                                                   \
+  EXPAND_STORE_TO(source, CONCAT(store_target, __COUNTER__))
 
 int access_wrapper(const char *path, int mode) {
   EXPAND_STORE(path);
@@ -90,24 +90,34 @@ int fstatat_wrapper(int fd, const char *path, struct stat *buf, int flag) {
   return fstatat(fd, path, buf, flag);
 }
 
-FTS *fts_open_wrapper(char *const *path_argv, int options,
-                      int (*compar)(const FTSENT **, const FTSENT **)) {
-  char **ptr = (char **)path_argv;
+void **copy_array(const void *const *array) {
+  void *const *ptr = (void *const)array;
   size_t len = 0;
 
   while (ptr[len++] != NULL)
     ;
 
-  char **path_argv_copy = malloc(len * sizeof(char *));
-  memcpy(path_argv_copy, path_argv, len * sizeof(char *));
+  void **array_copy = malloc(len * sizeof(void *));
+  memcpy(array_copy, array, len * sizeof(void *));
+
+  return array_copy;
+}
+
+FTS *fts_open_wrapper(char *const *path_argv, int options,
+                      int (*compar)(const FTSENT **, const FTSENT **)) {
+  raii char **path_argv_copy =
+      (char **)copy_array((const void *const *)path_argv);
 
   EXPAND_STORE(path_argv_copy[0]);
   return fts_open(path_argv_copy, options, compar);
 }
 
-// TODO: expand store
 FTS *fts_open_b_wrapper(char *const *path_argv, int options,
                         int (^compar)(const FTSENT **, const FTSENT **)) {
+  raii char **path_argv_copy =
+      (char **)copy_array((const void *const *)path_argv);
+
+  EXPAND_STORE(path_argv_copy[0]);
   return fts_open_b(path_argv, options, compar);
 }
 
