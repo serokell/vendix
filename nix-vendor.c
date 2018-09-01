@@ -1,324 +1,205 @@
-#include <dirent.h>
-#include <dlfcn.h>
-#include <fcntl.h>
+#define _GNU_SOURCE
+
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#include <sys/limits.h>
-#include <sys/stat.h>
+#include <dirent.h>   // opendir
+#include <dlfcn.h>    // dlopen
+#include <fcntl.h>    // open, openat
+#include <fts.h>      // fts_open, fts_open_b
+#include <ftw.h>      // ftw, nftw
+#include <sys/stat.h> // stat, lstat, fstatat
 
-#include <errno.h>
+#define NIX_HOME "/nix"
 
-int (*real_access)(const char *, int);
-int (*real_chdir)(const char *);
-void *(*real_dlopen)(const char *, int);
-int (*real_eaccess)(const char *, int);
-int (*real_execvp)(const char *, char *const[]);
-int (*real_euidaccess)(const char *, int);
-int (*real_faccessat)(int, const char *, int, int);
-FILE *(*real_fopen)(const char *, const char *);
-FILE *(*real_freopen)(const char *, const char *, FILE *);
-int (*real_fstatat)(int, const char *, struct stat *, int);
-int (*real_open)(const char *, int, ...);
-int (*real_openat)(int, const char *, int, ...);
-DIR *(*real_opendir)(const char *);
-long (*real_pathconf)(const char *, int);
-char *(*real_realpath)(const char *, char *);
-int (*real_stat)(const char *, struct stat *);
-int (*real_system)(const char *);
+// TODO: Call getenv("DYLD_ROOT_PATH") only once
+static char *expand_store(const char *path) {
+  char *store_path = NULL;
 
-void init() __attribute__((constructor)) {
-  real_access = dlsym(RTLD_NEXT, "access");
-  real_chdir = dlsym(RTLD_NEXT, "chdir");
-  real_dlopen = dlsym(RTLD_NEXT, "dlopen");
-  real_eaccess = dlsym(RTLD_NEXT, "eaccess");
-  real_execvp = dlsym(RTLD_NEXT, "execvp");
-  real_euidaccess = dlsym(RTLD_NEXT, "euidaccess");
-  real_faccessat = dlsym(RTLD_NEXT, "faccessat");
-  real_fopen = dlsym(RTLD_NEXT, "fopen");
-  real_freopen = dlsym(RTLD_NEXT, "freopen");
-  real_fstatat = dlsym(RTLD_NEXT, "fstatat");
-  real_open = dlsym(RTLD_NEXT, "open");
-  real_openat = dlsym(RTLD_NEXT, "openat");
-  real_opendir = dlsym(RTLD_NEXT, "opendir");
-  real_pathconf = dlsym(RTLD_NEXT, "pathconf");
-  real_realpath = dlsym(RTLD_NEXT, "realpath");
-  real_stat = dlsym(RTLD_NEXT, "stat");
-  real_system = dlsym(RTLD_NEXT, "system");
+  if (strncmp(NIX_HOME, path, strlen(NIX_HOME)) == 0)
+    asprintf(&store_path, "%s%s", getenv("DYLD_ROOT_PATH"), path);
+
+  return store_path;
 }
 
-#define NIX_PATH "/nix"
+static void freep(void *p) { free(*(void **)p); }
+#define raii __attribute__((cleanup(freep)))
 
-int access(const char *path, int mode) {
-  char *path_override = (char *)path;
+#define CONCAT_HELPER(x, y) x##y
+#define CONCAT(x, y) CONCAT_HELPER(x, y)
 
-  if (strncmp(NIX_PATH, path, strlen(NIX_PATH)) == 0)
-    asprintf(&path_override, "%s%s", getenv("BUNDLE_ROOT"), path);
+#define OR(x, y) x ? x : y
 
-  int ret = real_access(path_override, mode);
+#define EXPAND_STORE_TO(path, target)                                          \
+  raii char *target = expand_store(path);                                      \
+  path = OR(target, path)
 
-  if (path_override != path)
-    free(path_override);
+#define EXPAND_STORE(path)                                                     \
+  EXPAND_STORE_TO(path, CONCAT(store_path, __COUNTER__))
 
-  return ret;
+int access_wrapper(const char *path, int mode) {
+  EXPAND_STORE(path);
+  return access(path, mode);
 }
 
-int chdir(const char *path) {
-  char *path_override = (char *)path;
-
-  if (strncmp(NIX_PATH, path, strlen(NIX_PATH)) == 0)
-    asprintf(&path_override, "%s%s", getenv("BUNDLE_ROOT"), path);
-
-  int ret = real_chdir(path_override);
-
-  if (path_override != path)
-    free(path_override);
-
-  return ret;
+int chdir_wrapper(const char *path) {
+  EXPAND_STORE(path);
+  return chdir(path);
 }
 
-void *dlopen(const char *path, int flags) {
-  char *path_override = (char *)path;
-
-  if (strncmp(NIX_PATH, path, strlen(NIX_PATH)) == 0)
-    asprintf(&path_override, "%s%s", getenv("BUNDLE_ROOT"), path);
-
-  void *ret = real_dlopen(path_override, flags);
-
-  if (path_override != path)
-    free(path_override);
-
-  return ret;
+void *dlopen_wrapper(const char *path, int mode) {
+  EXPAND_STORE(path);
+  return dlopen(path, mode);
 }
 
-int execvp(const char *path, char *const argv[]) {
-  char *path_override = (char *)path;
+// execl
+// execle
+// execlp
 
-  if (strncmp(NIX_PATH, path, strlen(NIX_PATH)) == 0)
-    asprintf(&path_override, "%s%s", getenv("BUNDLE_ROOT"), path);
-
-  int ret = real_execvp(path_override, argv);
-
-  if (path_override != path)
-    free(path_override);
-
-  return ret;
+int execv_wrapper(const char *path, char *const argv[]) {
+  EXPAND_STORE(path);
+  return execv(path, argv);
 }
 
-int eaccess(const char *path, int mode) {
-  char *path_override = (char *)path;
-
-  if (strncmp(NIX_PATH, path, strlen(NIX_PATH)) == 0)
-    asprintf(&path_override, "%s%s", getenv("BUNDLE_ROOT"), path);
-
-  int ret = real_eaccess(path_override, mode);
-
-  if (path_override != path)
-    free(path_override);
-
-  return ret;
+int execvp_wrapper(const char *path, char *const argv[]) {
+  EXPAND_STORE(path);
+  return execvp(path, argv);
 }
 
-int euidaccess(const char *path, int mode) {
-  char *path_override = (char *)path;
-
-  if (strncmp(NIX_PATH, path, strlen(NIX_PATH)) == 0)
-    asprintf(&path_override, "%s%s", getenv("BUNDLE_ROOT"), path);
-
-  int ret = real_euidaccess(path_override, mode);
-
-  if (path_override != path)
-    free(path_override);
-
-  return ret;
+int execvP_wrapper(const char *path, const char *searched_path,
+                   char *const argv[]) {
+  EXPAND_STORE(path);
+  return execvP(path, searched_path, argv);
 }
 
-int faccessat(int fd, const char *path, int mode, int flags) {
-  char *path_override = (char *)path;
-
-  if (strncmp(NIX_PATH, path, strlen(NIX_PATH)) == 0)
-    asprintf(&path_override, "%s%s", getenv("BUNDLE_ROOT"), path);
-
-  int ret = real_faccessat(fd, path_override, mode, flags);
-
-  if (path_override != path)
-    free(path_override);
-
-  return ret;
+FILE *fopen_wrapper(const char *path, const char *mode) {
+  EXPAND_STORE(path);
+  return fopen(path, mode);
 }
 
-FILE *fopen(const char *path, const char *mode) {
-  char *path_override = (char *)path;
-
-  if (strncmp(NIX_PATH, path, strlen(NIX_PATH)) == 0)
-    asprintf(&path_override, "%s%s", getenv("BUNDLE_ROOT"), path);
-
-  FILE *ret = real_fopen(path_override, mode);
-
-  if (path_override != path)
-    free(path_override);
-
-  return ret;
+FILE *freopen_wrapper(const char *path, const char *mode, FILE *stream) {
+  EXPAND_STORE(path);
+  return freopen(path, mode, stream);
 }
 
-FILE *freopen(const char *path, const char *mode, FILE *stream) {
-  char *path_override = (char *)path;
-
-  if (strncmp(NIX_PATH, path, strlen(NIX_PATH)) == 0)
-    asprintf(&path_override, "%s%s", getenv("BUNDLE_ROOT"), path);
-
-  FILE *ret = real_freopen(path_override, mode, stream);
-
-  if (path_override != path)
-    free(path_override);
-
-  return ret;
+int fstatat_wrapper(int fd, const char *path, struct stat *buf, int flag) {
+  EXPAND_STORE(path);
+  return fstatat(fd, path, buf, flag);
 }
 
-int fstatat(int fd, const char *path, struct stat *buf, int flag) {
-  char *path_override = (char *)path;
+FTS *fts_open_wrapper(char *const *path_argv, int options,
+                      int (*compar)(const FTSENT **, const FTSENT **)) {
+  char **ptr = (char **)path_argv;
+  size_t len = 0;
 
-  if (strncmp(NIX_PATH, path, strlen(NIX_PATH)) == 0)
-    asprintf(&path_override, "%s%s", getenv("BUNDLE_ROOT"), path);
+  while (ptr[len++] != NULL)
+    ;
 
-  int ret = real_fstatat(fd, path_override, buf, flag);
+  char **path_argv_copy = malloc(len * sizeof(char *));
+  memcpy(path_argv_copy, path_argv, len * sizeof(char *));
 
-  if (path_override != path)
-    free(path_override);
-
-  return ret;
+  EXPAND_STORE(path_argv_copy[0]);
+  return fts_open(path_argv_copy, options, compar);
 }
 
-int lstat(const char *path, struct stat *buf) {
-  char *path_override = (char *)path;
-
-  if (strncmp(NIX_PATH, path, strlen(NIX_PATH)) == 0)
-    asprintf(&path_override, "%s%s", getenv("BUNDLE_ROOT"), path);
-
-  int ret = lstat64(path_override, (struct stat64 *)buf);
-
-  if (path_override != path)
-    free(path_override);
-
-  return ret;
+// TODO: expand store
+FTS *fts_open_b_wrapper(char *const *path_argv, int options,
+                        int (^compar)(const FTSENT **, const FTSENT **)) {
+  return fts_open_b(path_argv, options, compar);
 }
 
-int open(const char *path, int oflag, ...) {
+int ftw_wrapper(const char *path,
+                int (*fn)(const char *, const struct stat *ptr, int flag),
+                int depth) {
+  EXPAND_STORE(path);
+  return ftw(path, fn, depth);
+}
+
+int lstat_wrapper(const char *path, struct stat *buf) {
+  EXPAND_STORE(path);
+  return lstat(path, buf);
+}
+
+int open_wrapper(const char *path, int oflag, ...) {
   va_list args;
   va_start(args, oflag);
 
-  char *path_override = (char *)path;
   int mode = 0;
-
-  if (strncmp(NIX_PATH, path, strlen(NIX_PATH)) == 0)
-    asprintf(&path_override, "%s%s", getenv("BUNDLE_ROOT"), path);
 
   if (oflag & O_CREAT)
     mode = va_arg(args, int);
 
   va_end(args);
 
-  int ret = real_open(path_override, oflag, mode);
-
-  if (path_override != path)
-    free(path_override);
-
-  return ret;
+  EXPAND_STORE(path);
+  return open(path, oflag, mode);
 }
 
-int openat(int fd, const char *path, int oflag, ...) {
+int openat_wrapper(int fd, const char *path, int oflag, ...) {
   va_list args;
   va_start(args, oflag);
 
-  char *path_override = (char *)path;
-
   int mode = 0;
-
-  if (strncmp(NIX_PATH, path, strlen(NIX_PATH)) == 0)
-    asprintf(&path_override, "%s%s", getenv("BUNDLE_ROOT"), path);
 
   if (oflag & O_CREAT)
     mode = va_arg(args, int);
 
   va_end(args);
 
-  int ret = real_openat(fd, path_override, oflag, mode);
-
-  if (path_override != path)
-    free(path_override);
-
-  return ret;
+  EXPAND_STORE(path);
+  return openat(fd, path, oflag, mode);
 }
 
-DIR *opendir(const char *path) {
-  char *path_override = (char *)path;
-
-  if (strncmp(NIX_PATH, path, strlen(NIX_PATH)) == 0)
-    asprintf(&path_override, "%s%s", getenv("BUNDLE_ROOT"), path);
-
-  DIR *ret = real_opendir(path_override);
-
-  if (path_override != path)
-    free(path_override);
-
-  return ret;
+DIR *opendir_wrapper(const char *path) {
+  EXPAND_STORE(path);
+  return opendir(path);
 }
 
-long pathconf(const char *path, int name) {
-  char *path_override = (char *)path;
-
-  if (strncmp(NIX_PATH, path, strlen(NIX_PATH)) == 0)
-    asprintf(&path_override, "%s%s", getenv("BUNDLE_ROOT"), path);
-
-  long ret = real_pathconf(path_override, name);
-
-  if (path_override != path)
-    free(path_override);
-
-  return ret;
+long pathconf_wrapper(const char *path, int name) {
+  EXPAND_STORE(path);
+  return pathconf(path, name);
 }
 
-char *realpath(const char *path, char *resolved_path) {
-  char *path_override = (char *)path;
-
-  if (strncmp(NIX_PATH, path, strlen(NIX_PATH)) == 0)
-    asprintf(&path_override, "%s%s", getenv("BUNDLE_ROOT"), path);
-
-  char *ret = real_realpath(path_override, resolved_path);
-
-  if (path_override != path)
-    free(path_override);
-
-  return ret;
+char *realpath_wrapper(const char *path, char *resolved_path) {
+  EXPAND_STORE(path);
+  return realpath(path, resolved_path);
 }
 
-int stat(const char *path, struct stat *buf) {
-  char *path_override = (char *)path;
-
-  if (strncmp(NIX_PATH, path, strlen(NIX_PATH)) == 0)
-    asprintf(&path_override, "%s%s", getenv("BUNDLE_ROOT"), path);
-
-  int ret = stat64(path_override, (struct stat64 *)buf);
-
-  if (path_override != path)
-    free(path_override);
-
-  return ret;
+int stat_wrapper(const char *path, struct stat *buf) {
+  EXPAND_STORE(path);
+  return stat(path, buf);
 }
 
-int system(const char *command) {
-  char *command_override = (char *)command;
+// https://opensource.apple.com/source/dyld/dyld-210.2.3/include/mach-o/dyld-interposing.h
+#define DYLD_INTERPOSE(_replacement, _replacee)                                \
+  __attribute__((used)) static struct {                                        \
+    const void *replacement;                                                   \
+    const void *replacee;                                                      \
+  } _interpose_##_replacee __attribute__((section("__DATA,__interpose"))) = {  \
+      (const void *)(unsigned long)&_replacement,                              \
+      (const void *)(unsigned long)&_replacee};
 
-  if (strncmp(NIX_PATH, command, strlen(NIX_PATH)) == 0)
-    asprintf(&command_override, "%s%s", getenv("BUNDLE_ROOT"), command);
+#define WRAP(f) DYLD_INTERPOSE(f##_wrapper, f)
 
-  int ret = system(command_override);
-
-  if (command_override != command)
-    free(command_override);
-
-  return ret;
-}
+WRAP(access);
+WRAP(chdir);
+WRAP(dlopen);
+WRAP(execv);
+WRAP(execvp);
+WRAP(execvP);
+WRAP(fopen);
+WRAP(freopen);
+WRAP(fstatat);
+WRAP(fts_open);
+WRAP(fts_open_b);
+WRAP(ftw);
+WRAP(lstat);
+WRAP(open);
+WRAP(openat);
+WRAP(opendir);
+WRAP(pathconf);
+WRAP(realpath);
+WRAP(stat);
