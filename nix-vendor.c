@@ -133,6 +133,14 @@ int lstat_wrapper(const char *path, struct stat *buf) {
   return lstat(path, buf);
 }
 
+int nftw_wrapper(const char *path,
+                 int (*fn)(const char *, const struct stat *ptr, int flag,
+                           struct FTW *),
+                 int depth, int flags) {
+  EXPAND_STORE(path);
+  return nftw(path, fn, depth, flags);
+}
+
 int open_wrapper(const char *path, int oflag, ...) {
   va_list args;
   va_start(args, oflag);
@@ -207,6 +215,7 @@ WRAP(fts_open);
 WRAP(fts_open_b);
 WRAP(ftw);
 WRAP(lstat);
+WRAP(nftw);
 WRAP(open);
 WRAP(openat);
 WRAP(opendir);
