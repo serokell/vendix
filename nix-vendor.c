@@ -55,13 +55,42 @@ void *dlopen_wrapper(const char *path, int mode) {
   return dlopen(path, mode);
 }
 
-// execl
-// execle
-// execlp
+int execl_wrapper(const char *path, const char *arg0, ...) {
+  va_list args;
+  va_start(args, arg0);
+
+  raii const char **argv = malloc(sizeof(char *));
+
+  size_t i = 0;
+  argv[i] = arg0;
+
+  while (argv[i] != NULL) {
+    argv = realloc(argv, (++i + 1) * sizeof(char *));
+    argv[i] = va_arg(args, const char *);
+  }
+
+  va_end(args);
+
+  EXPAND_STORE(path);
+  return execvp(path, argv);
+}
+
+int execle_wrapper(const char *path, const char *arg0, ...) {
+  return -1; // TODO
+}
+
+int execlp_wrapper(const char *path, const char *arg0, ...) {
+  return -1; // TODO
+}
 
 int execv_wrapper(const char *path, char *const argv[]) {
   EXPAND_STORE(path);
   return execv(path, argv);
+}
+
+int execve_wrapper(const char *path, char *const argv[], char *const envp[]) {
+  EXPAND_STORE(path);
+  return execve(path, argv, envp);
 }
 
 int execvp_wrapper(const char *path, char *const argv[]) {
@@ -205,7 +234,9 @@ int stat_wrapper(const char *path, struct stat *buf) {
 WRAP(access);
 WRAP(chdir);
 WRAP(dlopen);
+WRAP(execl);
 WRAP(execv);
+WRAP(execve);
 WRAP(execvp);
 WRAP(execvP);
 WRAP(fopen);
