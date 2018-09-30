@@ -78,7 +78,7 @@ int execl_wrapper(const char *path, const char *arg0, ...) {
   va_end(args);
 
   EXPAND_STORE(path);
-  return execvp(path, (char * const *) argv);
+  return execvp(path, (char *const *)argv);
 }
 
 int execle_wrapper(const char *path, const char *arg0, ...) {
@@ -168,8 +168,8 @@ int ftw_wrapper(const char *path,
   return ftw(path, fn, depth);
 }
 
-ssize_t getxattr_wrapper(const char *path, const char *name, void *value, size_t size,
-         u_int32_t position, int options) {
+ssize_t getxattr_wrapper(const char *path, const char *name, void *value,
+                         size_t size, u_int32_t position, int options) {
   EXPAND_STORE(path);
   return getxattr(path, name, value, size, position, options);
 }
@@ -179,12 +179,14 @@ int link_wrapper(const char *path1, const char *path2) {
   return link(path1, path2);
 }
 
-int linkat_wrapper(int fd1, const char *path1, int fd2, const char *path2, int flag) {
+int linkat_wrapper(int fd1, const char *path1, int fd2, const char *path2,
+                   int flag) {
   EXPAND_STORE(path1);
   return linkat(fd1, path1, fd2, path2, flag);
 }
 
-ssize_t listxattr_wrapper(const char *path, char *namebuf, size_t size, int options) {
+ssize_t listxattr_wrapper(const char *path, char *namebuf, size_t size,
+                          int options) {
   EXPAND_STORE(path);
   return listxattr(path, namebuf, size, options);
 }
@@ -262,7 +264,8 @@ ssize_t readlink_wrapper(const char *path, char *buf, size_t bufsize) {
   return readlink(path, buf, bufsize);
 }
 
-ssize_t readlinkat_wrapper(int fd, const char *path, char *buf, size_t bufsize) {
+ssize_t readlinkat_wrapper(int fd, const char *path, char *buf,
+                           size_t bufsize) {
   EXPAND_STORE(path);
   return readlinkat(fd, path, buf, bufsize);
 }
