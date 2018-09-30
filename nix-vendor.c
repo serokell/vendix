@@ -266,6 +266,16 @@ int stat64_wrapper(const char *path, struct stat64 *buf) {
   return stat64(path, buf);
 }
 
+int symlink_wrapper(const char *path1, const char *path2) {
+  EXPAND_STORE(path1);
+  return symlink(path1, path2);
+}
+
+int symlinkat_wrapper(const char *path1, int fd, const char *path2) {
+  EXPAND_STORE(path1);
+  return symlinkat(path1, fd, path2);
+}
+
 int utimes_wrapper(const char *path, const struct timeval times[2]) {
   EXPAND_STORE(path);
   return utimes(path, times);
@@ -313,4 +323,6 @@ WRAP(realpath);
 WRAP(revoke);
 WRAP(stat);
 WRAP(stat64);
+WRAP(symlink);
+WRAP(symlinkat);
 WRAP(utimes);
