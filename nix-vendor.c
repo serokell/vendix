@@ -72,7 +72,7 @@ int execl_wrapper(const char *path, const char *arg0, ...) {
   va_end(args);
 
   EXPAND_STORE(path);
-  return execvp(path, argv);
+  return execvp(path, (char * const *) argv);
 }
 
 int execle_wrapper(const char *path, const char *arg0, ...) {
