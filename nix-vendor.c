@@ -240,6 +240,11 @@ long pathconf_wrapper(const char *path, int name) {
   return pathconf(path, name);
 }
 
+FILE *popen_wrapper(const char *command, const char *mode) {
+  EXPAND_STORE(command);
+  return popen(command, mode);
+}
+
 ssize_t readlink_wrapper(const char *path, char *buf, size_t bufsize) {
   EXPAND_STORE(path);
   return readlink(path, buf, bufsize);
@@ -295,6 +300,11 @@ int symlinkat_wrapper(const char *path1, int fd, const char *path2) {
   return symlinkat(path1, fd, path2);
 }
 
+int system_wrapper(const char *command) {
+  EXPAND_STORE(command);
+  return system(command);
+}
+
 int utimes_wrapper(const char *path, const struct timeval times[2]) {
   EXPAND_STORE(path);
   return utimes(path, times);
@@ -336,6 +346,7 @@ WRAP(open);
 WRAP(openat);
 WRAP(opendir);
 WRAP(pathconf);
+WRAP(popen);
 WRAP(readlink);
 WRAP(readlinkat);
 WRAP(realpath);
@@ -347,4 +358,5 @@ WRAP(statfs64);
 WRAP(statvfs);
 WRAP(symlink);
 WRAP(symlinkat);
+WRAP(system);
 WRAP(utimes);
