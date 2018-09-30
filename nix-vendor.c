@@ -251,6 +251,11 @@ char *realpath_wrapper(const char *path, char *resolved_path) {
   return realpath(path, resolved_path);
 }
 
+int revoke_wrapper(const char *path) {
+  EXPAND_STORE(path);
+  return revoke(path);
+}
+
 int stat_wrapper(const char *path, struct stat *buf) {
   EXPAND_STORE(path);
   return stat(path, buf);
@@ -305,6 +310,7 @@ WRAP(pathconf);
 WRAP(readlink);
 WRAP(readlinkat);
 WRAP(realpath);
+WRAP(revoke);
 WRAP(stat);
 WRAP(stat64);
 WRAP(utimes);
