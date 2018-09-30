@@ -104,6 +104,11 @@ int execvP_wrapper(const char *path, const char *searched_path,
   return execvP(path, searched_path, argv);
 }
 
+int faccessat_wrapper(int fd, const char *path, int mode, int flag) {
+  EXPAND_STORE(path);
+  return faccessat(fd, path, mode, flag);
+}
+
 FILE *fopen_wrapper(const char *path, const char *mode) {
   EXPAND_STORE(path);
   return fopen(path, mode);
@@ -160,6 +165,11 @@ int ftw_wrapper(const char *path,
 int lstat_wrapper(const char *path, struct stat *buf) {
   EXPAND_STORE(path);
   return lstat(path, buf);
+}
+
+int lstat64_wrapper(const char *path, struct stat64 *buf) {
+  EXPAND_STORE(path);
+  return lstat64(path, buf);
 }
 
 int nftw_wrapper(const char *path,
@@ -220,6 +230,11 @@ int stat_wrapper(const char *path, struct stat *buf) {
   return stat(path, buf);
 }
 
+int stat64_wrapper(const char *path, struct stat64 *buf) {
+  EXPAND_STORE(path);
+  return stat64(path, buf);
+}
+
 // https://opensource.apple.com/source/dyld/dyld-210.2.3/include/mach-o/dyld-interposing.h
 #define DYLD_INTERPOSE(_replacement, _replacee)                                \
   __attribute__((used)) static struct {                                        \
@@ -239,6 +254,7 @@ WRAP(execv);
 WRAP(execve);
 WRAP(execvp);
 WRAP(execvP);
+WRAP(faccessat);
 WRAP(fopen);
 WRAP(freopen);
 WRAP(fstatat);
@@ -246,6 +262,7 @@ WRAP(fts_open);
 WRAP(fts_open_b);
 WRAP(ftw);
 WRAP(lstat);
+WRAP(lstat64);
 WRAP(nftw);
 WRAP(open);
 WRAP(openat);
@@ -253,3 +270,4 @@ WRAP(opendir);
 WRAP(pathconf);
 WRAP(realpath);
 WRAP(stat);
+WRAP(stat64);
