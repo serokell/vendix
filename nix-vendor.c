@@ -6,13 +6,17 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <dirent.h>   // opendir
-#include <dlfcn.h>    // dlopen
-#include <fcntl.h>    // open, openat
-#include <fts.h>      // fts_open, fts_open_b
-#include <ftw.h>      // ftw, nftw
-#include <sys/stat.h> // stat, lstat, fstatat
-#include <sys/time.h> // utimes, lutimes
+#include <dirent.h> // opendir
+#include <dlfcn.h>  // dlopen
+#include <fcntl.h>  // open, openat
+#include <fts.h>    // fts_open, fts_open_b
+#include <ftw.h>    // ftw, nftw
+
+#include <sys/mount.h>   // statfs
+#include <sys/param.h>   // statfs
+#include <sys/stat.h>    // stat, lstat, fstatat
+#include <sys/statvfs.h> // statvfs
+#include <sys/time.h>    // utimes, lutimes
 
 #define NIX_HOME "/nix"
 
@@ -266,6 +270,21 @@ int stat64_wrapper(const char *path, struct stat64 *buf) {
   return stat64(path, buf);
 }
 
+int statfs_wrapper(const char *path, struct statfs *buf) {
+  EXPAND_STORE(path);
+  return statfs(path, buf);
+}
+
+int statfs64_wrapper(const char *path, struct statfs64 *buf) {
+  EXPAND_STORE(path);
+  return statfs64(path, buf);
+}
+
+int statvfs_wrapper(const char *path, struct statvfs *buf) {
+  EXPAND_STORE(path);
+  return statvfs(path, buf);
+}
+
 int symlink_wrapper(const char *path1, const char *path2) {
   EXPAND_STORE(path1);
   return symlink(path1, path2);
@@ -323,6 +342,9 @@ WRAP(realpath);
 WRAP(revoke);
 WRAP(stat);
 WRAP(stat64);
+WRAP(statfs);
+WRAP(statfs64);
+WRAP(statvfs);
 WRAP(symlink);
 WRAP(symlinkat);
 WRAP(utimes);
