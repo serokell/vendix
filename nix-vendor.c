@@ -220,6 +220,16 @@ long pathconf_wrapper(const char *path, int name) {
   return pathconf(path, name);
 }
 
+ssize_t readlink_wrapper(const char *path, char *buf, size_t bufsize) {
+  EXPAND_STORE(path);
+  return readlink(path, buf, bufsize);
+}
+
+ssize_t readlinkat_wrapper(int fd, const char *path, char *buf, size_t bufsize) {
+  EXPAND_STORE(path);
+  return readlinkat(fd, path, buf, bufsize);
+}
+
 char *realpath_wrapper(const char *path, char *resolved_path) {
   EXPAND_STORE(path);
   return realpath(path, resolved_path);
@@ -268,6 +278,8 @@ WRAP(open);
 WRAP(openat);
 WRAP(opendir);
 WRAP(pathconf);
+WRAP(readlink);
+WRAP(readlinkat);
 WRAP(realpath);
 WRAP(stat);
 WRAP(stat64);
