@@ -12,6 +12,7 @@
 #include <fts.h>      // fts_open, fts_open_b
 #include <ftw.h>      // ftw, nftw
 #include <sys/stat.h> // stat, lstat, fstatat
+#include <sys/time.h> // utimes, lutimes
 
 #define NIX_HOME "/nix"
 
@@ -182,6 +183,11 @@ int lstat64_wrapper(const char *path, struct stat64 *buf) {
   return lstat64(path, buf);
 }
 
+int lutimes_wrapper(const char *path, const struct timeval times[2]) {
+  EXPAND_STORE(path);
+  return lutimes(path, times);
+}
+
 int nftw_wrapper(const char *path,
                  int (*fn)(const char *, const struct stat *ptr, int flag,
                            struct FTW *),
@@ -255,6 +261,11 @@ int stat64_wrapper(const char *path, struct stat64 *buf) {
   return stat64(path, buf);
 }
 
+int utimes_wrapper(const char *path, const struct timeval times[2]) {
+  EXPAND_STORE(path);
+  return utimes(path, times);
+}
+
 // https://opensource.apple.com/source/dyld/dyld-210.2.3/include/mach-o/dyld-interposing.h
 #define DYLD_INTERPOSE(_replacement, _replacee)                                \
   __attribute__((used)) static struct {                                        \
@@ -285,6 +296,7 @@ WRAP(link);
 WRAP(linkat);
 WRAP(lstat);
 WRAP(lstat64);
+WRAP(lutimes);
 WRAP(nftw);
 WRAP(open);
 WRAP(openat);
@@ -295,3 +307,4 @@ WRAP(readlinkat);
 WRAP(realpath);
 WRAP(stat);
 WRAP(stat64);
+WRAP(utimes);
