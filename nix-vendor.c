@@ -17,6 +17,7 @@
 #include <sys/stat.h>    // stat, lstat, fstatat
 #include <sys/statvfs.h> // statvfs
 #include <sys/time.h>    // utimes, lutimes
+#include <sys/xattr.h>   // getxattr, listxattr
 
 #define NIX_HOME "/nix"
 
@@ -167,6 +168,12 @@ int ftw_wrapper(const char *path,
   return ftw(path, fn, depth);
 }
 
+ssize_t getxattr_wrapper(const char *path, const char *name, void *value, size_t size,
+         u_int32_t position, int options) {
+  EXPAND_STORE(path);
+  return getxattr(path, name, value, size, position, options);
+}
+
 int link_wrapper(const char *path1, const char *path2) {
   EXPAND_STORE(path1);
   return link(path1, path2);
@@ -175,6 +182,11 @@ int link_wrapper(const char *path1, const char *path2) {
 int linkat_wrapper(int fd1, const char *path1, int fd2, const char *path2, int flag) {
   EXPAND_STORE(path1);
   return linkat(fd1, path1, fd2, path2, flag);
+}
+
+ssize_t listxattr_wrapper(const char *path, char *namebuf, size_t size, int options) {
+  EXPAND_STORE(path);
+  return listxattr(path, namebuf, size, options);
 }
 
 int lstat_wrapper(const char *path, struct stat *buf) {
@@ -336,8 +348,10 @@ WRAP(fstatat);
 WRAP(fts_open);
 WRAP(fts_open_b);
 WRAP(ftw);
+WRAP(getxattr);
 WRAP(link);
 WRAP(linkat);
+WRAP(listxattr);
 WRAP(lstat);
 WRAP(lstat64);
 WRAP(lutimes);
